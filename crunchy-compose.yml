@@ -1,0 +1,76 @@
+version: "3.8"
+networks:
+  main:
+    attachable: true
+volumes:
+  primary_data:
+  standby_data:
+
+services:
+  primary:
+    container_name: crunchy-postgres-primary
+    hostname: crunchy-postgres-primary
+    image: crunchydata/crunchy-postgres:centos7-10.9-2.4.1
+    networks:
+     - main
+    volumes:
+      - primary_data:/pgdata
+    ports: ["12007:5432"]
+    environment:
+      TEMP_BUFFERS: 9MB
+      PGHOST: /tmp
+      MAX_CONNECTIONS: 101
+      SHARED_BUFFERS: 129MB
+      MAX_WAL_SENDERS: 7
+      WORK_MEM: 5MB
+      PG_MODE: primary
+      PG_PRIMARY_USER: primaryuser
+      PG_PRIMARY_PASSWORD: password
+      PG_PRIMARY_PORT: 5432
+      PG_ROOT_PASSWORD: password
+      PG_USER: testuser
+      PG_PASSWORD: password
+      PG_DATABASE: userdb
+  standby:
+    container_name: crunchy-postgres-standby
+    hostname: crunchy-postgres-standby
+    image: crunchydata/crunchy-postgres:centos7-10.9-2.4.1
+    networks:
+      - main
+    volumes:
+      - standby_data:/pgdata
+    ports: ["12008:5432"]
+    environment:
+      TEMP_BUFFERS: 9MB
+      PG_PRIMARY_HOST: crunchy-postgres-primary
+      PGHOST: /tmp
+      MAX_CONNECTIONS: 101
+      SHARED_BUFFERS: 129MB
+      MAX_WAL_SENDERS: 7
+      WORK_MEM: 5MB
+      PG_MODE: replica
+      PG_PRIMARY_USER: primaryuser
+      PG_PRIMARY_PASSWORD: password
+      PG_PRIMARY_PORT: 5432
+      PG_ROOT_PASSWORD: password
+      PG_USER: testuser
+      PG_PASSWORD: password
+      PG_DATABASE: userdb
+    depends_on:
+      - primary
+  pgpool:
+    container_name: crunchy-pgpool
+    hostname: crunchy-pgpool
+    image: crunchydata/crunchy-pgpool:centos7-10.9-2.4.1
+    networks:
+      - main
+    ports: ["12003:5432"]
+    environment:
+      PG_PRIMARY_SERVICE_NAME: crunchy-postgres-primary
+      PG_REPLICA_SERVICE_NAME: crunchy-postgres-standby
+      PG_USERNAME: testuser
+      PG_PASSWORD: password
+      PG_DATABASE: userdb
+    depends_on:
+      - primary
+      - standby
